@@ -255,37 +255,37 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
   log->LOG(&memberNode->addr, "Message recieved, size: %i, '%s'", size, str);
 #endif
 
+  // Reading incoming Message into the nice struct form of MessageHdr
   msg = (MessageHdr *) malloc(size * sizeof(char));
   memcpy((char *)(msg), data, size);
 
-  // newnodeaddr = (Address *) malloc(sizeof(Address));
-  // memcpy((char *)(newnodeaddr->addr), data+sizeof(MessageHdr), sizeof(newnodeaddr->addr));
+  if(msg->msgType == JOINREQ) { // ----------- JOINREQ type of incoming Message
 
-  if(msg->msgType == JOINREQ) {
 #ifdef DEBUGLOG
-    log->LOG(&memberNode->addr, "Message type is JOINREQ: '%02x'", msg->msgType);
-    log->LOG(&memberNode->addr, "New addr is: '%s'", msg->senderAddr.getAddress().c_str());
+    log->LOG(&memberNode->addr, "Message type is JOINREQ. Sender: Id '%i', Addr '%s'",
+             msg->senderData.getid(),
+             msg->senderAddr.getAddress().c_str());
 #endif
 
     MemberListEntry newlistentry;
     memberNode->memberList.push_back(newlistentry);
-    log->logNodeAdd(&memberNode->addr, &msg->senderAddr);
 
+    log->logNodeAdd(&memberNode->addr, &msg->senderAddr); // --------- Output for Grader
+
+#ifdef DEBUGLOG
     log->LOG(&memberNode->addr, "MemberListSize: %i", memberNode->memberList.size());
+#endif
 
-    // Acknowledge join request. Send memberlist back.
-//    unsigned long membercount = memberNode->memberList.size();
     size_t memberlistdatalength = sizeof(MemberListEntry)*memberNode->memberList.size();
     size_t respmsgsize = sizeof(MessageHdr) + memberlistdatalength + 1;
     respmsg = (MessageHdr *) malloc(respmsgsize * sizeof(char));
 
     MemberListEntry mle(0, 0, memberNode->heartbeat, par->getcurrtime());
-    // create JOINREP message: format of data is {struct Address myaddr}
     respmsg->msgType = JOINREP;
-    //memcpy((char *)(respmsg+1), &membercount, sizeof(membercount));
-    //memcpy((char *)(respmsg+1) + sizeof(membercount), memberNode->memberList.data(), memberlistdatalength);
     respmsg->senderAddr = memberNode->addr;
     respmsg->senderData = mle;
+
+    // Adding bytes from MemberList.data() beyond the MessageHdr in Response Message.
     respmsg->msgDataSize = memberlistdatalength;
     memcpy((char *)(respmsg) + sizeof(MessageHdr), memberNode->memberList.data(), memberlistdatalength);
 
@@ -301,22 +301,25 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
 
     free(respmsg);
 
-  } else if (msg->msgType == JOINREP) {
-    memberNode->inGroup = true;
+  } else if (msg->msgType == JOINREP) { // ----------- JOINREP type of incoming Message
+#ifdef DEBUGLOG
     log->LOG(&memberNode->addr,
      "Message type JOINREP! I'm added to the group!: msgsize: '%i', senderAddr: '%s', senderData-id: '%i', msgDataSize: '%i'",
      size,
      msg->senderAddr.getAddress().c_str(),
      msg->senderData.getid(),
      msg->msgDataSize);
- //   memberNode->memberList.resize(msg->msgDataSize/sizeof(MemberListEntry));
-  } else {
+#endif
+
+    memberNode->inGroup = true;
+
+    // TODO: read member list
+
+  } else { // ----------- UNKNOWN type of incoming Message
     log->LOG(&memberNode->addr, "Message type unexpected!: '%02x'", msg->msgType);
   };
 
   free(msg);
-//  free(newnodeaddr);
-
   return(true);
 }
 
