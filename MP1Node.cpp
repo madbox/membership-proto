@@ -2,7 +2,7 @@
  * FILE NAME: MP1Node.cpp
  *
  * DESCRIPTION: Membership protocol run by this Node.
- * 				Definition of MP1Node class functions.
+ *              Definition of MP1Node class functions.
  **********************************/
 
 #include "MP1Node.h"
@@ -36,7 +36,7 @@ MP1Node::~MP1Node() {}
  * FUNCTION NAME: recvLoop
  *
  * DESCRIPTION: This function receives message from the network and pushes into the queue
- * 				This function is called by a node to receive messages currently waiting for it
+ *              This function is called by a node to receive messages currently waiting for it
  */
 int MP1Node::recvLoop() {
   if ( memberNode->bFailed ) {
@@ -61,8 +61,8 @@ int MP1Node::enqueueWrapper(void *env, char *buff, int size) {
  * FUNCTION NAME: nodeStart
  *
  * DESCRIPTION: This function bootstraps the node
- * 				All initializations routines for a member.
- * 				Called by the application layer.
+ *              All initializations routines for a member.
+ *              Called by the application layer.
  */
 void MP1Node::nodeStart(char *servaddrstr, short servport) {
   Address joinaddr;
@@ -99,6 +99,9 @@ int MP1Node::initThisNode(Address *joinaddr) {
   int id = *(int*)(&memberNode->addr.addr);
   int port = *(short*)(&memberNode->addr.addr[4]);
 
+//  log->LOG(&memberNode->addr, "Initialization started: '%i':'%i'", id, port);
+
+
   memberNode->bFailed = false;
   memberNode->inited = true;
   memberNode->inGroup = false;
@@ -109,9 +112,16 @@ int MP1Node::initThisNode(Address *joinaddr) {
   memberNode->timeOutCounter = -1;
   initMemberListTable(memberNode);
 
-  log->LOG(&memberNode->addr,
-           "Initialization done: '%i':'%i'", id, port);
+//  log->LOG(&memberNode->addr, "Initialization done: '%i':'%i'", id, port);
 
+  if ( 0 == memcmp((char *)&(memberNode->addr.addr), (char *)&(joinaddr->addr), sizeof(memberNode->addr.addr))) {
+#ifdef DEBUGLOG
+    log->LOG(&memberNode->addr, "!!!...");
+#endif
+    MemberListEntry newlistentry(id, port);
+    memberNode->memberList.push_back(newlistentry);
+    log->logNodeAdd(&memberNode->addr, joinaddr);
+  }
 
   return 0;
 }
@@ -135,13 +145,22 @@ int MP1Node::introduceSelfToGroup(Address *joinaddr) {
     memberNode->inGroup = true;
   }
   else {
-    size_t msgsize = sizeof(MessageHdr) + sizeof(joinaddr->addr) + sizeof(long) + 1;
-    msg = (MessageHdr *) malloc(msgsize * sizeof(char));
+    //~ size_t msgsize = sizeof(MessageHdr) + sizeof(joinaddr->addr) + sizeof(long) + 1;
+    //~ msg = (MessageHdr *) malloc(msgsize * sizeof(char));
+//~
+    //~ // create JOINREQ message: format of data is {struct Address myaddr}
+    //~ msg->msgType = JOINREQ;
+    //~ memcpy((char *)(msg+1), &memberNode->addr.addr, sizeof(memberNode->addr.addr));
+    //~ memcpy((char *)(msg+1) + 1 + sizeof(memberNode->addr.addr), &memberNode->heartbeat, sizeof(long));
 
+    size_t msgsize = sizeof(MessageHdr); // no additional data for JOINREQ, the header only
+    MemberListEntry mle(0, 0, memberNode->heartbeat, par->getcurrtime());
+    msg = (MessageHdr *) malloc(msgsize * sizeof(char));
     // create JOINREQ message: format of data is {struct Address myaddr}
     msg->msgType = JOINREQ;
-    memcpy((char *)(msg+1), &memberNode->addr.addr, sizeof(memberNode->addr.addr));
-    memcpy((char *)(msg+1) + 1 + sizeof(memberNode->addr.addr), &memberNode->heartbeat, sizeof(long));
+    msg->senderAddr = memberNode->addr;
+    msg->senderData = mle;
+    msg->msgDataSize = 0;
 
 #ifdef DEBUGLOG
     sprintf(s, "Trying to join...");
@@ -174,7 +193,7 @@ int MP1Node::finishUpThisNode(){
  * FUNCTION NAME: nodeLoop
  *
  * DESCRIPTION: Executed periodically at each member
- * 				Check your messages in queue and perform membership protocol duties
+ *              Check your messages in queue and perform membership protocol duties
  */
 void MP1Node::nodeLoop() {
   if (memberNode->bFailed) {
@@ -223,6 +242,81 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
   /*
    * Your code goes here
    */
+
+  MessageHdr *msg;
+  MessageHdr *respmsg;
+//  Address *newnodeaddr;
+
+#ifdef DEBUGLOG
+  char str[3000] = {0};
+  int i;
+  for(i=0;i<size;i++)
+    sprintf(str+i*2,"%02x",data[i]);
+  log->LOG(&memberNode->addr, "Message recieved, size: %i, '%s'", size, str);
+#endif
+
+  msg = (MessageHdr *) malloc(size * sizeof(char));
+  memcpy((char *)(msg), data, size);
+
+  // newnodeaddr = (Address *) malloc(sizeof(Address));
+  // memcpy((char *)(newnodeaddr->addr), data+sizeof(MessageHdr), sizeof(newnodeaddr->addr));
+
+  if(msg->msgType == JOINREQ) {
+#ifdef DEBUGLOG
+    log->LOG(&memberNode->addr, "Message type is JOINREQ: '%02x'", msg->msgType);
+    log->LOG(&memberNode->addr, "New addr is: '%s'", msg->senderAddr.getAddress().c_str());
+#endif
+
+    MemberListEntry newlistentry;
+    memberNode->memberList.push_back(newlistentry);
+    log->logNodeAdd(&memberNode->addr, &msg->senderAddr);
+
+    log->LOG(&memberNode->addr, "MemberListSize: %i", memberNode->memberList.size());
+
+    // Acknowledge join request. Send memberlist back.
+//    unsigned long membercount = memberNode->memberList.size();
+    size_t memberlistdatalength = sizeof(MemberListEntry)*memberNode->memberList.size();
+    size_t respmsgsize = sizeof(MessageHdr) + memberlistdatalength + 1;
+    respmsg = (MessageHdr *) malloc(respmsgsize * sizeof(char));
+
+    MemberListEntry mle(0, 0, memberNode->heartbeat, par->getcurrtime());
+    // create JOINREP message: format of data is {struct Address myaddr}
+    respmsg->msgType = JOINREP;
+    //memcpy((char *)(respmsg+1), &membercount, sizeof(membercount));
+    //memcpy((char *)(respmsg+1) + sizeof(membercount), memberNode->memberList.data(), memberlistdatalength);
+    respmsg->senderAddr = memberNode->addr;
+    respmsg->senderData = mle;
+    respmsg->msgDataSize = memberlistdatalength;
+    memcpy((char *)(respmsg) + sizeof(MessageHdr), memberNode->memberList.data(), memberlistdatalength);
+
+#ifdef DEBUGLOG
+    log->LOG(&memberNode->addr, "Sending JOINREP to '%s'. msgsize: '%i', member count: '%i'",
+             msg->senderAddr.getAddress().c_str(),
+             respmsgsize,
+             memberNode->memberList.size());
+#endif
+
+    // send JOINREP message to newby
+    emulNet->ENsend(&memberNode->addr, &msg->senderAddr, (char *)respmsg, respmsgsize);
+
+    free(respmsg);
+
+  } else if (msg->msgType == JOINREP) {
+    memberNode->inGroup = true;
+    log->LOG(&memberNode->addr,
+     "Message type JOINREP! I'm added to the group!: msgsize: '%i', senderAddr: '%s', senderData-id: '%i', msgDataSize: '%i'",
+     size,
+     msg->senderAddr.getAddress().c_str(),
+     msg->senderData.getid(),
+     msg->msgDataSize);
+ //   memberNode->memberList.resize(msg->msgDataSize/sizeof(MemberListEntry));
+  } else {
+    log->LOG(&memberNode->addr, "Message type unexpected!: '%02x'", msg->msgType);
+  };
+
+  free(msg);
+//  free(newnodeaddr);
+
   return(true);
 }
 
@@ -230,14 +324,18 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
  * FUNCTION NAME: nodeLoopOps
  *
  * DESCRIPTION: Check if any node hasn't responded within a timeout period and then delete
- * 				the nodes
- * 				Propagate your membership list
+ *              the nodes
+ *              Propagate your membership list
  */
 void MP1Node::nodeLoopOps() {
 
   /*
    * Your code goes here
    */
+
+#ifdef DEBUGLOG
+//    log->LOG(&memberNode->addr, "nodeLoopOps");
+#endif
 
   return;
 }
@@ -283,5 +381,5 @@ void MP1Node::initMemberListTable(Member *memberNode) {
 void MP1Node::printAddress(Address *addr)
 {
   printf("%d.%d.%d.%d:%d \n",  addr->addr[0],addr->addr[1],addr->addr[2],
-         addr->addr[3], *(short*)&addr->addr[4]) ;    
+         addr->addr[3], *(short*)&addr->addr[4]) ;
 }

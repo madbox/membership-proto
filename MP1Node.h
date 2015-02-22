@@ -2,7 +2,7 @@
  * FILE NAME: MP1Node.cpp
  *
  * DESCRIPTION: Membership protocol run by this Node.
- * 				Header file of MP1Node class.
+ *              Header file of MP1Node class.
  **********************************/
 
 #ifndef _MP1NODE_H_
@@ -20,7 +20,8 @@
  */
 #define TREMOVE 20
 #define TFAIL 5
-
+#define TPINGTIMEOUT 1
+#define GOSIPCOUNT 2
 /*
  * Note: You can change/add any functions in MP1Node.{h,cpp}
  */
@@ -31,6 +32,7 @@
 enum MsgTypes{
     JOINREQ,
     JOINREP,
+    HEARTBEAT,
     DUMMYLASTMSGTYPE
 };
 
@@ -40,7 +42,10 @@ enum MsgTypes{
  * DESCRIPTION: Header and content of a message
  */
 typedef struct MessageHdr {
-	enum MsgTypes msgType;
+    enum MsgTypes msgType;
+    Address senderAddr;
+    MemberListEntry senderData; // id, heartbeat, timestamp
+    unsigned long msgDataSize;
 }MessageHdr;
 
 /**
@@ -50,32 +55,32 @@ typedef struct MessageHdr {
  */
 class MP1Node {
 private:
-	EmulNet *emulNet;
-	Log *log;
-	Params *par;
-	Member *memberNode;
-	char NULLADDR[6];
+    EmulNet *emulNet;
+    Log *log;
+    Params *par;
+    Member *memberNode;
+    char NULLADDR[6];
 
 public:
-	MP1Node(Member *, Params *, EmulNet *, Log *, Address *);
-	Member * getMemberNode() {
-		return memberNode;
-	}
-	int recvLoop();
-	static int enqueueWrapper(void *env, char *buff, int size);
-	void nodeStart(char *servaddrstr, short serverport);
-	int initThisNode(Address *joinaddr);
-	int introduceSelfToGroup(Address *joinAddress);
-	int finishUpThisNode();
-	void nodeLoop();
-	void checkMessages();
-	bool recvCallBack(void *env, char *data, int size);
-	void nodeLoopOps();
-	int isNullAddress(Address *addr);
-	Address getJoinAddress();
-	void initMemberListTable(Member *memberNode);
-	void printAddress(Address *addr);
-	virtual ~MP1Node();
+    MP1Node(Member *, Params *, EmulNet *, Log *, Address *);
+    Member * getMemberNode() {
+        return memberNode;
+    }
+    int recvLoop();
+    static int enqueueWrapper(void *env, char *buff, int size);
+    void nodeStart(char *servaddrstr, short serverport);
+    int initThisNode(Address *joinaddr);
+    int introduceSelfToGroup(Address *joinAddress);
+    int finishUpThisNode();
+    void nodeLoop();
+    void checkMessages();
+    bool recvCallBack(void *env, char *data, int size);
+    void nodeLoopOps();
+    int isNullAddress(Address *addr);
+    Address getJoinAddress();
+    void initMemberListTable(Member *memberNode);
+    void printAddress(Address *addr);
+    virtual ~MP1Node();
 };
 
 #endif /* _MP1NODE_H_ */
