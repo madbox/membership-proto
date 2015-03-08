@@ -371,14 +371,29 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
 
     memberNode->inGroup = true;
 
+
+    // loading incoming memberlist
+    vector <MemberListEntry> incomingMemberList;
     unsigned long incomingMemberListSize = 0;
     incomingMemberListSize = msg->msgDataSize / sizeof(MemberListEntry);
 
-    // log->LOG(&memberNode->addr, "Incoming memberlist size: %i, current my member list size: %i", incomingMemberListSize, memberNode->memberList.size());
+    // log->LOG(&memberNode->addr, "HEARTBEATREP Incoming memberlist size: %i, current my member list size: %i", incomingMemberListSize, memberNode->memberList.size());
 
-    // TODO: nullify memberList, it should be empty.
-    memberNode->memberList.resize(incomingMemberListSize);
-    memcpy(memberNode->memberList.data(), ((char *)(msg)) + sizeof(MessageHdr), msg->msgDataSize);
+    incomingMemberList.resize(incomingMemberListSize);
+    memcpy(incomingMemberList.data(), ((char *)(msg)) + sizeof(MessageHdr), msg->msgDataSize);
+
+    updateMemberListTable(memberNode, &incomingMemberList);
+
+
+
+    //~ unsigned long incomingMemberListSize = 0;
+    //~ incomingMemberListSize = msg->msgDataSize / sizeof(MemberListEntry);
+//~
+    //~ // log->LOG(&memberNode->addr, "Incoming memberlist size: %i, current my member list size: %i", incomingMemberListSize, memberNode->memberList.size());
+//~
+    //~ // TODO: nullify memberList, it should be empty.
+    //~ memberNode->memberList.resize(incomingMemberListSize);
+    //~ memcpy(memberNode->memberList.data(), ((char *)(msg)) + sizeof(MessageHdr), msg->msgDataSize);
 
 #ifdef DEBUGLOG
     char str2[3000] = {0};
