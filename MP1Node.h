@@ -19,8 +19,9 @@
  * Macros
  */
 #define TREMOVE 20
-#define TFAIL 5
-#define TPINGTIMEOUT 1
+#define TFAIL 10
+#define THEARTBEATRATE 3
+#define TPINGTIMEOUT 2
 #define GOSIPCOUNT 2
 /*
  * Note: You can change/add any functions in MP1Node.{h,cpp}
@@ -33,6 +34,7 @@ enum MsgTypes{
     JOINREQ,
     JOINREP,
     HEARTBEAT,
+    HEARTBEATREP,
     DUMMYLASTMSGTYPE
 };
 
@@ -71,6 +73,10 @@ public:
     void nodeStart(char *servaddrstr, short serverport);
     int initThisNode(Address *joinaddr);
     int introduceSelfToGroup(Address *joinAddress);
+    int sendHeartbeat(Address *trg_addr);
+    int sendHeartbeatReply(Address *trg_addr);
+    int updateMemberListTable(Member *memberNode, MemberListEntry *incomingMLE);
+    int updateMemberListTable(Member *memberNode, vector <MemberListEntry> *incomingML);
     int finishUpThisNode();
     void nodeLoop();
     void checkMessages();
@@ -79,8 +85,12 @@ public:
     int isNullAddress(Address *addr);
     Address getJoinAddress();
     void initMemberListTable(Member *memberNode);
+    void clanupMemberListTable(Member *memberNode);
     void printAddress(Address *addr);
     virtual ~MP1Node();
+
+    int getid() const;
+    int getport() const;
 };
 
 #endif /* _MP1NODE_H_ */

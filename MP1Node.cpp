@@ -27,6 +27,14 @@ MP1Node::MP1Node(Member *member, Params *params, EmulNet *emul, Log *log, Addres
   this->memberNode->addr = *address;
 }
 
+int MP1Node::getid() const {
+  return *(int*)(&memberNode->addr.addr);
+}
+
+int MP1Node::getport() const {
+  return *(short*)(&memberNode->addr.addr[4]);
+}
+
 /**
  * Destructor of the MP1Node class
  */
@@ -96,11 +104,9 @@ int MP1Node::initThisNode(Address *joinaddr) {
   /*
    * This function is partially implemented and may require changes
    */
-  int id = *(int*)(&memberNode->addr.addr);
-  int port = *(short*)(&memberNode->addr.addr[4]);
 
 //  log->LOG(&memberNode->addr, "Initialization started: '%i':'%i'", id, port);
-
+  srand(time(NULL));
 
   memberNode->bFailed = false;
   memberNode->inited = true;
@@ -112,13 +118,13 @@ int MP1Node::initThisNode(Address *joinaddr) {
   memberNode->timeOutCounter = -1;
   initMemberListTable(memberNode);
 
-//  log->LOG(&memberNode->addr, "Initialization done: '%i':'%i'", id, port);
+  log->LOG(&memberNode->addr, "Initialization done: '%i':'%i'", getid(), getport());
 
   if ( 0 == memcmp((char *)&(memberNode->addr.addr), (char *)&(joinaddr->addr), sizeof(memberNode->addr.addr))) {
 #ifdef DEBUGLOG
     log->LOG(&memberNode->addr, "!!!...");
 #endif
-    MemberListEntry newlistentry(id, port);
+    MemberListEntry newlistentry(getid(), getport(), 0, par->getcurrtime());
     memberNode->memberList.push_back(newlistentry);
     log->logNodeAdd(&memberNode->addr, joinaddr);
   }
@@ -145,16 +151,8 @@ int MP1Node::introduceSelfToGroup(Address *joinaddr) {
     memberNode->inGroup = true;
   }
   else {
-    //~ size_t msgsize = sizeof(MessageHdr) + sizeof(joinaddr->addr) + sizeof(long) + 1;
-    //~ msg = (MessageHdr *) malloc(msgsize * sizeof(char));
-//~
-    //~ // create JOINREQ message: format of data is {struct Address myaddr}
-    //~ msg->msgType = JOINREQ;
-    //~ memcpy((char *)(msg+1), &memberNode->addr.addr, sizeof(memberNode->addr.addr));
-    //~ memcpy((char *)(msg+1) + 1 + sizeof(memberNode->addr.addr), &memberNode->heartbeat, sizeof(long));
-
     size_t msgsize = sizeof(MessageHdr); // no additional data for JOINREQ, the header only
-    MemberListEntry mle(0, 0, memberNode->heartbeat, par->getcurrtime());
+    MemberListEntry mle(getid(), getport(), memberNode->heartbeat, par->getcurrtime());
     msg = (MessageHdr *) malloc(msgsize * sizeof(char));
     // create JOINREQ message: format of data is {struct Address myaddr}
     msg->msgType = JOINREQ;
@@ -175,6 +173,69 @@ int MP1Node::introduceSelfToGroup(Address *joinaddr) {
 
   return 1;
 
+}
+
+int MP1Node::sendHeartbeatReply(Address *trg_addr){
+    MessageHdr *msg;
+
+    //TODO: do heartbeat++ here?
+
+    size_t memberlistdatalength = sizeof(MemberListEntry)*memberNode->memberList.size();
+    size_t respmsgsize = sizeof(MessageHdr) + memberlistdatalength + 1;
+    msg = (MessageHdr *) malloc(respmsgsize * sizeof(char));
+
+    MemberListEntry mle(getid(), getport(), memberNode->heartbeat, par->getcurrtime());
+    msg->msgType = HEARTBEATREP;
+    msg->senderAddr = memberNode->addr;
+    msg->senderData = mle;
+
+    // Adding bytes from MemberList.data() beyond the MessageHdr in Response Message.
+    msg->msgDataSize = memberlistdatalength;
+    memcpy((char *)(msg) + sizeof(MessageHdr), memberNode->memberList.data(), memberlistdatalength);
+
+    #ifdef DEBUGLOG
+    log->LOG(&memberNode->addr, "Sending HEARTBEATREP to '%s'. msgsize: '%i', member count: '%i'",
+             trg_addr->getAddress().c_str(),
+             respmsgsize,
+             memberNode->memberList.size());
+
+    //~ char str3[3000] = {0};
+    //~ if (memberNode->memberList.size()==9){
+        //~ for(unsigned int i3=0;i3<32;i3++)
+            //~ sprintf(str3+i3*2,"%02x",((char *)(memberNode->memberList.data()))[i3]);
+        //~ log->LOG(&memberNode->addr, "------ MemberList vector data: %s", str3);
+    //~ }
+    #endif
+
+    // send HEARTBEATREP message to newby
+    emulNet->ENsend(&memberNode->addr, trg_addr, (char *)msg, respmsgsize);
+
+    free(msg);
+
+    return 0;
+}
+
+int MP1Node::sendHeartbeat(Address *trg_addr){
+  MessageHdr *msg;
+
+  memberNode->heartbeat++;
+
+  size_t msgsize = sizeof(MessageHdr); // no additional data for HEARTBEAT, the header only
+  MemberListEntry mle(getid(), getport(), memberNode->heartbeat, par->getcurrtime());
+  msg = (MessageHdr *) malloc(msgsize * sizeof(char));
+  // create HEARTBEAT message: format of data is {struct Address myaddr}
+  msg->msgType = HEARTBEAT;
+  msg->senderAddr = memberNode->addr;
+  msg->senderData = mle;
+  msg->msgDataSize = 0;
+
+  // send JOINREQ message to introducer member
+
+  emulNet->ENsend(&memberNode->addr, trg_addr, (char *)msg, msgsize);
+
+  free(msg);
+
+  return 1;
 }
 
 /**
@@ -239,21 +300,16 @@ void MP1Node::checkMessages() {
  * DESCRIPTION: Message handler for different message types
  */
 bool MP1Node::recvCallBack(void *env, char *data, int size ) {
-  /*
-   * Your code goes here
-   */
-
   MessageHdr *msg;
   MessageHdr *respmsg;
-//  Address *newnodeaddr;
 
-#ifdef DEBUGLOG
-  char str[3000] = {0};
-  int i;
-  for(i=0;i<size;i++)
-    sprintf(str+i*2,"%02x",data[i]);
-  log->LOG(&memberNode->addr, "Message recieved, size: %i, '%s'", size, str);
-#endif
+//~ #ifdef DEBUGLOG
+  //~ char str[3000] = {0};
+  //~ int i;
+  //~ for(i=0;i<size;i++)
+    //~ sprintf(str+i*2,"%02x",data[i]);
+  //~ log->LOG(&memberNode->addr, "Message recieved, size: %i, '%s'", size, str);
+//~ #endif
 
   // Reading incoming Message into the nice struct form of MessageHdr
   msg = (MessageHdr *) malloc(size * sizeof(char));
@@ -261,18 +317,13 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
 
   if(msg->msgType == JOINREQ) { // ----------- JOINREQ type of incoming Message
 
+    memberNode->memberList.push_back(msg->senderData);
+    log->logNodeAdd(&memberNode->addr, &msg->senderAddr); // --------- Output for Grader
+
 #ifdef DEBUGLOG
     log->LOG(&memberNode->addr, "Message type is JOINREQ. Sender: Id '%i', Addr '%s'",
              msg->senderData.getid(),
              msg->senderAddr.getAddress().c_str());
-#endif
-
-    MemberListEntry newlistentry;
-    memberNode->memberList.push_back(newlistentry);
-
-    log->logNodeAdd(&memberNode->addr, &msg->senderAddr); // --------- Output for Grader
-
-#ifdef DEBUGLOG
     log->LOG(&memberNode->addr, "MemberListSize: %i", memberNode->memberList.size());
 #endif
 
@@ -280,7 +331,7 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
     size_t respmsgsize = sizeof(MessageHdr) + memberlistdatalength + 1;
     respmsg = (MessageHdr *) malloc(respmsgsize * sizeof(char));
 
-    MemberListEntry mle(0, 0, memberNode->heartbeat, par->getcurrtime());
+    MemberListEntry mle(getid(), getport(), memberNode->heartbeat, par->getcurrtime());
     respmsg->msgType = JOINREP;
     respmsg->senderAddr = memberNode->addr;
     respmsg->senderData = mle;
@@ -294,6 +345,13 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
              msg->senderAddr.getAddress().c_str(),
              respmsgsize,
              memberNode->memberList.size());
+
+    char str3[3000] = {0};
+    if (memberNode->memberList.size()==9){
+        for(unsigned int i3=0;i3<32;i3++)
+            sprintf(str3+i3*2,"%02x",((char *)(memberNode->memberList.data()))[i3]);
+        log->LOG(&memberNode->addr, "------ MemberList vector data: %s", str3);
+    }
 #endif
 
     // send JOINREP message to newby
@@ -313,10 +371,56 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
 
     memberNode->inGroup = true;
 
-    // TODO: read member list
+    unsigned long incomingMemberListSize = 0;
+    incomingMemberListSize = msg->msgDataSize / sizeof(MemberListEntry);
+
+    log->LOG(&memberNode->addr, "Incoming memberlist size: %i, current my member list size: %i", incomingMemberListSize, memberNode->memberList.size());
+
+    // TODO: nullify memberList, it should be empty.
+    memberNode->memberList.resize(incomingMemberListSize);
+    memcpy(memberNode->memberList.data(), ((char *)(msg)) + sizeof(MessageHdr), msg->msgDataSize);
+
+#ifdef DEBUGLOG
+    char str2[3000] = {0};
+    for(unsigned int i2=0;i2<msg->msgDataSize;i2++)
+        sprintf(str2+i2*2,"%02x",(((char *)(msg)) + sizeof(MessageHdr))[i2]);
+    log->LOG(&memberNode->addr, "'%s'", str2);
+#endif
+
+  } else if (msg->msgType == HEARTBEAT) { // ----------- HEARTBEAT type of incoming Message
+#ifdef DEBUGLOG
+    log->LOG(&memberNode->addr,
+      "Message type HEARTBEAT! msgsize: '%i', senderAddr: '%s', senderData-id: '%i', senderData-heartbeat: '%i'",
+      size,
+      msg->senderAddr.getAddress().c_str(),
+      msg->senderData.getid(),
+      msg->senderData.getheartbeat());
+#endif
+
+    updateMemberListTable(memberNode, &msg->senderData);
+
+    // generating HEARTBEATREP message
+    sendHeartbeatReply(&msg->senderAddr);
+
+  } else if (msg->msgType == HEARTBEATREP) {
+    updateMemberListTable(memberNode, &msg->senderData);
+
+    // loading incoming memberlist
+    vector <MemberListEntry> incomingMemberList;
+    unsigned long incomingMemberListSize = 0;
+    incomingMemberListSize = msg->msgDataSize / sizeof(MemberListEntry);
+
+    log->LOG(&memberNode->addr, "HEARTBEATREP Incoming memberlist size: %i, current my member list size: %i", incomingMemberListSize, memberNode->memberList.size());
+
+    incomingMemberList.resize(incomingMemberListSize);
+    memcpy(incomingMemberList.data(), ((char *)(msg)) + sizeof(MessageHdr), msg->msgDataSize);
+
+    updateMemberListTable(memberNode, &incomingMemberList);
 
   } else { // ----------- UNKNOWN type of incoming Message
+#ifdef DEBUGLOG
     log->LOG(&memberNode->addr, "Message type unexpected!: '%02x'", msg->msgType);
+#endif
   };
 
   free(msg);
@@ -331,10 +435,29 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
  *              Propagate your membership list
  */
 void MP1Node::nodeLoopOps() {
+  char addr_str[50];
 
-  /*
-   * Your code goes here
-   */
+   // update this node heartbeat in memberlist and remove failed nodes
+
+  clanupMemberListTable(memberNode);
+
+  if (par->getcurrtime()%THEARTBEATRATE==0){
+    int i = rand() % memberNode->memberList.size();
+    //~ log->LOG(&memberNode->addr, "Rand: '%i'", i);
+    if (memberNode->memberList.at(i).getid() == getid()) {
+      i = (i + 1) % memberNode->memberList.size();
+      //~ log->LOG(&memberNode->addr, "Rand2: '%i'", i);
+    }
+
+    sprintf(addr_str, "%i:0", memberNode->memberList.at(i).getid());
+    Address trg_addr(addr_str);
+    if (!(trg_addr == memberNode->addr)) {
+      log->LOG(&memberNode->addr, "Sending Heartbeat to '%s'", trg_addr.getAddress().c_str());
+      sendHeartbeat(&trg_addr);
+    } else {
+        log->LOG(&memberNode->addr, "Will not sending Heartbeat to myself '%s'", trg_addr.getAddress().c_str());
+    }
+  }
 
 #ifdef DEBUGLOG
 //    log->LOG(&memberNode->addr, "nodeLoopOps");
@@ -374,6 +497,90 @@ Address MP1Node::getJoinAddress() {
  */
 void MP1Node::initMemberListTable(Member *memberNode) {
   memberNode->memberList.clear();
+}
+
+void MP1Node::clanupMemberListTable(Member *memberNode) {
+  for (auto it = memberNode->memberList.begin(); it != memberNode->memberList.end();) {
+    if (it->id == getid()) {
+//      log->LOG(&memberNode->addr, "Updating own timestamp, memberlist size: '%i'", memberNode->memberList.size());
+      it->timestamp = par->getcurrtime();
+      ++it;
+    } else if (par->getcurrtime() - it->timestamp > TFAIL) {
+      log->LOG(&memberNode->addr, "MemberList entry: '%i' failed. Erasing it!", it->id);
+      char addr_str[50];
+      sprintf(addr_str, "%i.0.0.0:0", it->id-1);
+      Address tmp_addr(addr_str);
+      log->logNodeRemove(&memberNode->addr, &tmp_addr);
+      it = memberNode->memberList.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
+
+/**
+ * FUNCTION NAME: updateMemberListTable
+ *
+ * DESCRIPTION: Update MemberList with new heartbeat and timestamp if entry with same id exists. If no such id found, than new entry will be added to MemberList.
+ */
+int MP1Node::updateMemberListTable(Member *memberNode, MemberListEntry *incomingMLE) {
+  for (auto it = memberNode->memberList.begin(); it != memberNode->memberList.end(); ++it) {
+    if (it->id == incomingMLE->getid()) {
+      log->LOG(&memberNode->addr, "updateMemberListTable - entry found: '%i', hb: '%i', inchb: '%i'", it->id, it->heartbeat, incomingMLE->heartbeat);
+      if (it->heartbeat<incomingMLE->heartbeat) {
+        it->heartbeat = incomingMLE->heartbeat;
+        it->timestamp = par->getcurrtime();
+      }
+      return it->id;
+      // TODO: test for duplicated MemberList entries
+    }
+  }
+  log->LOG(&memberNode->addr, "updateMemberListTable - entry NOT found: '%i'. Adding!", incomingMLE->getid());
+  memberNode->memberList.push_back(*incomingMLE);
+
+  char addr_str[50];
+  sprintf(addr_str, "%i.0.0.0:0", incomingMLE->id);
+  Address tmp_addr(addr_str);
+
+  log->logNodeAdd(&memberNode->addr, &tmp_addr);
+  return 0;
+}
+
+/**
+ * FUNCTION NAME: updateMemberList
+ *
+ * DESCRIPTION: Update MemberList with new heartbeat and timestamp if entry with same id exists. If no such id found, than new entry will be added to MemberList.
+ */
+int MP1Node::updateMemberListTable(Member *memberNode, vector <MemberListEntry> *incomingML) {
+  for (auto it = memberNode->memberList.begin(); it != memberNode->memberList.end(); ++it) {
+    for (auto it_inc = incomingML->begin(); it_inc != incomingML->end();) {
+      if (it->id == it_inc->id) {
+        if (it->heartbeat<it_inc->heartbeat) {
+          it->heartbeat = it_inc->heartbeat;
+          it->timestamp = it_inc->timestamp;
+        }
+        it_inc = incomingML->erase(it_inc);
+      } else {
+        ++it_inc;
+      }
+    }
+
+  }
+
+  if (incomingML->size() > 0) {
+    log->LOG(&memberNode->addr, "updateMemberListTable v - entries NOT found: '%i'pcs. Adding!", incomingML->size());
+
+    for (auto it_inc = incomingML->begin(); it_inc != incomingML->end(); ++it_inc) {
+      memberNode->memberList.push_back(*it_inc);
+
+      char addr_str[50];
+      sprintf(addr_str, "%i.0.0.0:0", it_inc->id);
+      Address tmp_addr(addr_str);
+
+      log->logNodeAdd(&memberNode->addr, &tmp_addr);
+    }
+  }
+  return 0;
 }
 
 /**
