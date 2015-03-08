@@ -20,7 +20,7 @@
  */
 #define TREMOVE 20
 #define TFAIL 10
-#define THEARTBEATRATE 3
+#define THEARTBEATRATE 1
 #define TPINGTIMEOUT 2
 #define GOSIPCOUNT 2
 /*

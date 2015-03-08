@@ -79,7 +79,7 @@ void MP1Node::nodeStart(char *servaddrstr, short servport) {
   // Self booting routines
   if( initThisNode(&joinaddr) == -1 ) {
 #ifdef DEBUGLOG
-    log->LOG(&memberNode->addr, "init_thisnode failed. Exit.");
+    // log->LOG(&memberNode->addr, "init_thisnode failed. Exit.");
 #endif
     exit(1);
   }
@@ -87,7 +87,7 @@ void MP1Node::nodeStart(char *servaddrstr, short servport) {
   if( !introduceSelfToGroup(&joinaddr) ) {
     finishUpThisNode();
 #ifdef DEBUGLOG
-    log->LOG(&memberNode->addr, "Unable to join self to group. Exiting.");
+    // log->LOG(&memberNode->addr, "Unable to join self to group. Exiting.");
 #endif
     exit(1);
   }
@@ -105,7 +105,7 @@ int MP1Node::initThisNode(Address *joinaddr) {
    * This function is partially implemented and may require changes
    */
 
-//  log->LOG(&memberNode->addr, "Initialization started: '%i':'%i'", id, port);
+//  // log->LOG(&memberNode->addr, "Initialization started: '%i':'%i'", id, port);
   srand(time(NULL));
 
   memberNode->bFailed = false;
@@ -118,11 +118,11 @@ int MP1Node::initThisNode(Address *joinaddr) {
   memberNode->timeOutCounter = -1;
   initMemberListTable(memberNode);
 
-  log->LOG(&memberNode->addr, "Initialization done: '%i':'%i'", getid(), getport());
+  // log->LOG(&memberNode->addr, "Initialization done: '%i':'%i'", getid(), getport());
 
   if ( 0 == memcmp((char *)&(memberNode->addr.addr), (char *)&(joinaddr->addr), sizeof(memberNode->addr.addr))) {
 #ifdef DEBUGLOG
-    log->LOG(&memberNode->addr, "!!!...");
+    // log->LOG(&memberNode->addr, "!!!...");
 #endif
     MemberListEntry newlistentry(getid(), getport(), 0, par->getcurrtime());
     memberNode->memberList.push_back(newlistentry);
@@ -146,7 +146,7 @@ int MP1Node::introduceSelfToGroup(Address *joinaddr) {
   if ( 0 == memcmp((char *)&(memberNode->addr.addr), (char *)&(joinaddr->addr), sizeof(memberNode->addr.addr))) {
     // I am the group booter (first process to join the group). Boot up the group
 #ifdef DEBUGLOG
-    log->LOG(&memberNode->addr, "Starting up group...");
+    // log->LOG(&memberNode->addr, "Starting up group...");
 #endif
     memberNode->inGroup = true;
   }
@@ -162,7 +162,7 @@ int MP1Node::introduceSelfToGroup(Address *joinaddr) {
 
 #ifdef DEBUGLOG
     sprintf(s, "Trying to join...");
-    log->LOG(&memberNode->addr, s);
+    // log->LOG(&memberNode->addr, s);
 #endif
 
     // send JOINREQ message to introducer member
@@ -194,16 +194,16 @@ int MP1Node::sendHeartbeatReply(Address *trg_addr){
     memcpy((char *)(msg) + sizeof(MessageHdr), memberNode->memberList.data(), memberlistdatalength);
 
     #ifdef DEBUGLOG
-    log->LOG(&memberNode->addr, "Sending HEARTBEATREP to '%s'. msgsize: '%i', member count: '%i'",
-             trg_addr->getAddress().c_str(),
-             respmsgsize,
-             memberNode->memberList.size());
+    // log->LOG(&memberNode->addr, "Sending HEARTBEATREP to '%s'. msgsize: '%i', member count: '%i'",
+    //         trg_addr->getAddress().c_str(),
+    //         respmsgsize,
+    //         memberNode->memberList.size());
 
     //~ char str3[3000] = {0};
     //~ if (memberNode->memberList.size()==9){
         //~ for(unsigned int i3=0;i3<32;i3++)
             //~ sprintf(str3+i3*2,"%02x",((char *)(memberNode->memberList.data()))[i3]);
-        //~ log->LOG(&memberNode->addr, "------ MemberList vector data: %s", str3);
+        //~ // log->LOG(&memberNode->addr, "------ MemberList vector data: %s", str3);
     //~ }
     #endif
 
@@ -308,7 +308,7 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
   //~ int i;
   //~ for(i=0;i<size;i++)
     //~ sprintf(str+i*2,"%02x",data[i]);
-  //~ log->LOG(&memberNode->addr, "Message recieved, size: %i, '%s'", size, str);
+  //~ // log->LOG(&memberNode->addr, "Message recieved, size: %i, '%s'", size, str);
 //~ #endif
 
   // Reading incoming Message into the nice struct form of MessageHdr
@@ -321,10 +321,10 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
     log->logNodeAdd(&memberNode->addr, &msg->senderAddr); // --------- Output for Grader
 
 #ifdef DEBUGLOG
-    log->LOG(&memberNode->addr, "Message type is JOINREQ. Sender: Id '%i', Addr '%s'",
-             msg->senderData.getid(),
-             msg->senderAddr.getAddress().c_str());
-    log->LOG(&memberNode->addr, "MemberListSize: %i", memberNode->memberList.size());
+    // log->LOG(&memberNode->addr, "Message type is JOINREQ. Sender: Id '%i', Addr '%s'",
+    //         msg->senderData.getid(),
+    //         msg->senderAddr.getAddress().c_str());
+    // log->LOG(&memberNode->addr, "MemberListSize: %i", memberNode->memberList.size());
 #endif
 
     size_t memberlistdatalength = sizeof(MemberListEntry)*memberNode->memberList.size();
@@ -341,16 +341,16 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
     memcpy((char *)(respmsg) + sizeof(MessageHdr), memberNode->memberList.data(), memberlistdatalength);
 
 #ifdef DEBUGLOG
-    log->LOG(&memberNode->addr, "Sending JOINREP to '%s'. msgsize: '%i', member count: '%i'",
-             msg->senderAddr.getAddress().c_str(),
-             respmsgsize,
-             memberNode->memberList.size());
+    // log->LOG(&memberNode->addr, "Sending JOINREP to '%s'. msgsize: '%i', member count: '%i'",
+    //         msg->senderAddr.getAddress().c_str(),
+    //         respmsgsize,
+    //         memberNode->memberList.size());
 
     char str3[3000] = {0};
     if (memberNode->memberList.size()==9){
         for(unsigned int i3=0;i3<32;i3++)
             sprintf(str3+i3*2,"%02x",((char *)(memberNode->memberList.data()))[i3]);
-        log->LOG(&memberNode->addr, "------ MemberList vector data: %s", str3);
+        // log->LOG(&memberNode->addr, "------ MemberList vector data: %s", str3);
     }
 #endif
 
@@ -361,12 +361,12 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
 
   } else if (msg->msgType == JOINREP) { // ----------- JOINREP type of incoming Message
 #ifdef DEBUGLOG
-    log->LOG(&memberNode->addr,
-     "Message type JOINREP! I'm added to the group!: msgsize: '%i', senderAddr: '%s', senderData-id: '%i', msgDataSize: '%i'",
-     size,
-     msg->senderAddr.getAddress().c_str(),
-     msg->senderData.getid(),
-     msg->msgDataSize);
+    // log->LOG(&memberNode->addr,
+     //~ "Message type JOINREP! I'm added to the group!: msgsize: '%i', senderAddr: '%s', senderData-id: '%i', msgDataSize: '%i'",
+     //~ size,
+     //~ msg->senderAddr.getAddress().c_str(),
+     //~ msg->senderData.getid(),
+     //~ msg->msgDataSize);
 #endif
 
     memberNode->inGroup = true;
@@ -374,7 +374,7 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
     unsigned long incomingMemberListSize = 0;
     incomingMemberListSize = msg->msgDataSize / sizeof(MemberListEntry);
 
-    log->LOG(&memberNode->addr, "Incoming memberlist size: %i, current my member list size: %i", incomingMemberListSize, memberNode->memberList.size());
+    // log->LOG(&memberNode->addr, "Incoming memberlist size: %i, current my member list size: %i", incomingMemberListSize, memberNode->memberList.size());
 
     // TODO: nullify memberList, it should be empty.
     memberNode->memberList.resize(incomingMemberListSize);
@@ -384,17 +384,17 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
     char str2[3000] = {0};
     for(unsigned int i2=0;i2<msg->msgDataSize;i2++)
         sprintf(str2+i2*2,"%02x",(((char *)(msg)) + sizeof(MessageHdr))[i2]);
-    log->LOG(&memberNode->addr, "'%s'", str2);
+    // log->LOG(&memberNode->addr, "'%s'", str2);
 #endif
 
   } else if (msg->msgType == HEARTBEAT) { // ----------- HEARTBEAT type of incoming Message
 #ifdef DEBUGLOG
-    log->LOG(&memberNode->addr,
-      "Message type HEARTBEAT! msgsize: '%i', senderAddr: '%s', senderData-id: '%i', senderData-heartbeat: '%i'",
-      size,
-      msg->senderAddr.getAddress().c_str(),
-      msg->senderData.getid(),
-      msg->senderData.getheartbeat());
+    // log->LOG(&memberNode->addr,
+      //~ "Message type HEARTBEAT! msgsize: '%i', senderAddr: '%s', senderData-id: '%i', senderData-heartbeat: '%i'",
+      //~ size,
+      //~ msg->senderAddr.getAddress().c_str(),
+      //~ msg->senderData.getid(),
+      //~ msg->senderData.getheartbeat());
 #endif
 
     updateMemberListTable(memberNode, &msg->senderData);
@@ -410,7 +410,7 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
     unsigned long incomingMemberListSize = 0;
     incomingMemberListSize = msg->msgDataSize / sizeof(MemberListEntry);
 
-    log->LOG(&memberNode->addr, "HEARTBEATREP Incoming memberlist size: %i, current my member list size: %i", incomingMemberListSize, memberNode->memberList.size());
+    // log->LOG(&memberNode->addr, "HEARTBEATREP Incoming memberlist size: %i, current my member list size: %i", incomingMemberListSize, memberNode->memberList.size());
 
     incomingMemberList.resize(incomingMemberListSize);
     memcpy(incomingMemberList.data(), ((char *)(msg)) + sizeof(MessageHdr), msg->msgDataSize);
@@ -419,7 +419,7 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
 
   } else { // ----------- UNKNOWN type of incoming Message
 #ifdef DEBUGLOG
-    log->LOG(&memberNode->addr, "Message type unexpected!: '%02x'", msg->msgType);
+    // log->LOG(&memberNode->addr, "Message type unexpected!: '%02x'", msg->msgType);
 #endif
   };
 
@@ -437,30 +437,32 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
 void MP1Node::nodeLoopOps() {
   char addr_str[50];
 
-   // update this node heartbeat in memberlist and remove failed nodes
+
+  // log->LOG(&memberNode->addr, "MemberList size: '%i'", memberNode->memberList.size());
+  // update this node heartbeat in memberlist and remove failed nodes
 
   clanupMemberListTable(memberNode);
 
   if (par->getcurrtime()%THEARTBEATRATE==0){
     int i = rand() % memberNode->memberList.size();
-    //~ log->LOG(&memberNode->addr, "Rand: '%i'", i);
+    //~ // log->LOG(&memberNode->addr, "Rand: '%i'", i);
     if (memberNode->memberList.at(i).getid() == getid()) {
       i = (i + 1) % memberNode->memberList.size();
-      //~ log->LOG(&memberNode->addr, "Rand2: '%i'", i);
+      //~ // log->LOG(&memberNode->addr, "Rand2: '%i'", i);
     }
 
     sprintf(addr_str, "%i:0", memberNode->memberList.at(i).getid());
     Address trg_addr(addr_str);
     if (!(trg_addr == memberNode->addr)) {
-      log->LOG(&memberNode->addr, "Sending Heartbeat to '%s'", trg_addr.getAddress().c_str());
+      // log->LOG(&memberNode->addr, "Sending Heartbeat to '%s'", trg_addr.getAddress().c_str());
       sendHeartbeat(&trg_addr);
     } else {
-        log->LOG(&memberNode->addr, "Will not sending Heartbeat to myself '%s'", trg_addr.getAddress().c_str());
+        // log->LOG(&memberNode->addr, "Will not sending Heartbeat to myself '%s'", trg_addr.getAddress().c_str());
     }
   }
 
 #ifdef DEBUGLOG
-//    log->LOG(&memberNode->addr, "nodeLoopOps");
+//    // log->LOG(&memberNode->addr, "nodeLoopOps");
 #endif
 
   return;
@@ -502,13 +504,13 @@ void MP1Node::initMemberListTable(Member *memberNode) {
 void MP1Node::clanupMemberListTable(Member *memberNode) {
   for (auto it = memberNode->memberList.begin(); it != memberNode->memberList.end();) {
     if (it->id == getid()) {
-//      log->LOG(&memberNode->addr, "Updating own timestamp, memberlist size: '%i'", memberNode->memberList.size());
+//      // log->LOG(&memberNode->addr, "Updating own timestamp, memberlist size: '%i'", memberNode->memberList.size());
       it->timestamp = par->getcurrtime();
       ++it;
     } else if (par->getcurrtime() - it->timestamp > TFAIL) {
-      log->LOG(&memberNode->addr, "MemberList entry: '%i' failed. Erasing it!", it->id);
+      // log->LOG(&memberNode->addr, "MemberList entry: '%i' failed. Erasing it!", it->id);
       char addr_str[50];
-      sprintf(addr_str, "%i.0.0.0:0", it->id-1);
+      sprintf(addr_str, "%i.0.0.0:0", it->id);
       Address tmp_addr(addr_str);
       log->logNodeRemove(&memberNode->addr, &tmp_addr);
       it = memberNode->memberList.erase(it);
@@ -526,7 +528,7 @@ void MP1Node::clanupMemberListTable(Member *memberNode) {
 int MP1Node::updateMemberListTable(Member *memberNode, MemberListEntry *incomingMLE) {
   for (auto it = memberNode->memberList.begin(); it != memberNode->memberList.end(); ++it) {
     if (it->id == incomingMLE->getid()) {
-      log->LOG(&memberNode->addr, "updateMemberListTable - entry found: '%i', hb: '%i', inchb: '%i'", it->id, it->heartbeat, incomingMLE->heartbeat);
+      // log->LOG(&memberNode->addr, "updateMemberListTable - entry found: '%i', hb: '%i', inchb: '%i'", it->id, it->heartbeat, incomingMLE->heartbeat);
       if (it->heartbeat<incomingMLE->heartbeat) {
         it->heartbeat = incomingMLE->heartbeat;
         it->timestamp = par->getcurrtime();
@@ -535,7 +537,7 @@ int MP1Node::updateMemberListTable(Member *memberNode, MemberListEntry *incoming
       // TODO: test for duplicated MemberList entries
     }
   }
-  log->LOG(&memberNode->addr, "updateMemberListTable - entry NOT found: '%i'. Adding!", incomingMLE->getid());
+  // log->LOG(&memberNode->addr, "updateMemberListTable - entry NOT found: '%i'. Adding!", incomingMLE->getid());
   memberNode->memberList.push_back(*incomingMLE);
 
   char addr_str[50];
@@ -568,16 +570,17 @@ int MP1Node::updateMemberListTable(Member *memberNode, vector <MemberListEntry> 
   }
 
   if (incomingML->size() > 0) {
-    log->LOG(&memberNode->addr, "updateMemberListTable v - entries NOT found: '%i'pcs. Adding!", incomingML->size());
+    // log->LOG(&memberNode->addr, "updateMemberListTable v - entries NOT found: '%i'pcs. Adding!", incomingML->size());
 
     for (auto it_inc = incomingML->begin(); it_inc != incomingML->end(); ++it_inc) {
-      memberNode->memberList.push_back(*it_inc);
 
-      char addr_str[50];
-      sprintf(addr_str, "%i.0.0.0:0", it_inc->id);
-      Address tmp_addr(addr_str);
-
-      log->logNodeAdd(&memberNode->addr, &tmp_addr);
+      if (par->getcurrtime() - it_inc->timestamp < TFAIL) {
+          memberNode->memberList.push_back(*it_inc);
+          char addr_str[50];
+          sprintf(addr_str, "%i.0.0.0:0", it_inc->id);
+          Address tmp_addr(addr_str);
+          log->logNodeAdd(&memberNode->addr, &tmp_addr);
+      }
     }
   }
   return 0;

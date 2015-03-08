@@ -159,6 +159,7 @@ else
     for i in $joinfrom
     do
         jointo=`grep joined dbg.log | grep '^ '$i | cut -d" " -f4-7 | grep -v $i | sort -u | wc -l`
+        echo "jointo: "$jointo
         if [ $jointo -eq 9 ]; then
             cnt=`expr $cnt + 1`
         fi
